@@ -210,7 +210,6 @@ String getPage()
             <button class="button" onclick="selectProgramCiclo(this, 'CURTO')">CURTO</button>
             <button class="button" onclick="selectProgramCiclo(this, 'MOLHO')">MOLHO</button>
             <button class="button" onclick="selectProgramCiclo(this, 'ESVAZIAR')">ESVAZIAR</button>
-            <button class="button" onclick="selectProgramCiclo(this, 'ENCHER')">ENCHER</button>
         </div>
         <div class="label">Nível de Água:</div>
         <div class="grid" id="nivel">
@@ -218,8 +217,11 @@ String getPage()
             <button class="button" onclick="selectNivelAgua(this, 'MÉDIO')">MÉDIO</button>
             <button class="button" onclick="selectNivelAgua(this, 'BAIXO')">BAIXO</button>
         </div>
-        <button class="button" id="toggleButton" onclick="checkSelectedButtons()">LIGAR</button>
-    </div>
+        <div class="label">Botões de Controle:</div>
+            <button class="button" id="toggleButtonLiga" onclick="checkSelectedButtons()">LIGAR</button>
+            <button class="button" id="toggleButtonPause" onclick="checkSelectedButtons()">PAUSAR</button>   
+        </div>
+   </div>
     <script>
         let selectedProgramCiclo = "";
         let selectedWaterLevel = "";
@@ -268,6 +270,7 @@ String getPage()
         function checkSelectedButtons() {
             const selectedCiclo = document.querySelectorAll(`#${'ciclo'} .button.selected`);
             const selectedNivel = document.querySelectorAll(`#${'nivel'} .button.selected`);
+            const selectedPause = document.querySelectorAll(`#${'nivel'} .button.selected`);
             if (selectedCiclo.length !== 1 || selectedNivel.length !== 1) {
                 alert("Por favor, selecione um programa e um nível de água antes de ligar.");
             } else {
