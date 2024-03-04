@@ -28,6 +28,7 @@ unsigned long sendDataPrevMillis = 0;
 void SeMexe(String ciclo);
 void buzina(void);
 void desligar(void);
+void sendData(const char *data);
 
 ////////////////////////////
 const char *ssid = "ZEUS_2G";
@@ -87,22 +88,27 @@ void loop()
         if (ESTADO == "LIGAR")
         {
             // SeMexe(programa);
-            Serial.print("SE MEXE  => ");
-            delay(1000);
             Serial.println(ESTADO);
             delay(1000);
         }
-        else
+        else if (ESTADO == "DESLIGAR")
         {
-            Serial.print("DESLIGA  => ");
-            delay(1000);
             Serial.println(ESTADO);
             delay(1000);
-
             desligar(); // Chama a função desligar() caso contrário
         }
-        novoDado = false;
+        else if (ESTADO == "PAUSAR")
+        {
+            Serial.println(ESTADO);
+            delay(1000);
+        }
+        else if (ESTADO == "REINICIAR")
+        {
+            Serial.println(ESTADO);
+            delay(1000);
+        }
     }
+    novoDado = false;
 }
 
 void handleRoot()
@@ -124,110 +130,131 @@ void handleData()
     String nivel = doc["nivel"];
     ESTADO = action;
 
-    Serial.print("Ação: ");
-    Serial.println(action);
-    Serial.print("Programa: ");
-    Serial.println(programa);
-    Serial.print("Nível: ");
-    Serial.println(nivel);
+    // Serial.print("Ação: ");
+    // Serial.println(action);
+    // Serial.print("Programa: ");
+    // Serial.println(programa);
+    // Serial.print("Nível: ");
+    // Serial.println(nivel);
 
     server.send(200, "text/plain", "Dados recebidos pelo ESP8266.");
-
     novoDado = true;
 }
 
 String getPage()
 {
     // Crie a página HTML
-    const char *webpage = R"=====(
-<!DOCTYPE html>
-<html lang="en">
+    const char *webpage = R"=====(<!DOCTYPE html>
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Malob: Tanquinho Esperto</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Três Containers com Botões</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 10% 15%;
+        padding: 0;
+    }
+    h1 {
+        font-size: 24px; /* Altere este valor conforme necessário */
+    }
+
+    .container {
+        margin: 10px;
+        padding: 10px;
+        background-color: #f2f2f2;
+        border-radius: 5px;
+    }
+
+    .container label {
+        font-weight: bold;
+        display: block;
+        margin-bottom: 10px;
+    }
+
+    .button {
+        background-color: green;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        cursor: pointer;
+        border-radius: 5px;
+        text-align: center;
+        display: block;
+        margin: 5px auto;
+    }
+
+    .button:hover {
+        background-color: #45a049;
+    }
+
+    .button.selected {
+        background-color: blue;
+    }
+
+    .mensagem {
+        width: calc(100% - 20px);
+        height: 100px;
+        resize: none;
+        margin-top: 10px;
+    }
+
+    @media screen and (max-width: 600px) {
         .container {
-            max-width: 90%;
-            padding: 20px;
-            background-color: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-top: 10px;
-            margin-bottom: 20px;
-            font-size: 20px;
-        }
-        .label {
-            font-weight: bold;
-            margin-bottom: 5px;
-            margin-top: 15px;
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 10px;
+            margin: 5px;
+            padding: 5px;
         }
         .button {
-            background-color: green;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            cursor: pointer;
-            border-radius: 5px;
-            text-align: center;
+            width: 100%;
         }
-        .button.selected {
-            background-color: blue;
-        }
-
-        #toggleButton {
-            margin: 20px auto 0;
-            display: block;
-        }
-    </style>
+    }
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>Malob: Tanquinho Esperto</h1>
-        <div class="label">Programas:</div>
-        <div class="grid" id="ciclo">
-            <button class="button" onclick="selectProgramCiclo(this, 'LONGO')">LONGO</button>
-            <button class="button" onclick="selectProgramCiclo(this, 'MÉDIO')">MÉDIO</button>
-            <button class="button" onclick="selectProgramCiclo(this, 'CURTO')">CURTO</button>
-            <button class="button" onclick="selectProgramCiclo(this, 'MOLHO')">MOLHO</button>
-            <button class="button" onclick="selectProgramCiclo(this, 'ESVAZIAR')">ESVAZIAR</button>
-        </div>
-        <div class="label">Nível de Água:</div>
+
+<div class="container">
+<h1>Malob: TANQUINHO ESPERTO</h1>
+    <label>PROGRAMAS:</label>
+    <div class="grid" id="ciclo">
+    <button class="button" onclick="selectProgramCiclo(this, 'LONGO')">LONGO</button>
+    <button class="button" onclick="selectProgramCiclo(this, 'MÉDIO')">MÉDIO</button>
+    <button class="button" onclick="selectProgramCiclo(this, 'CURTO')">CURTO</button>
+    <button class="button" onclick="selectProgramCiclo(this, 'MOLHO')">MOLHO</button>
+    <button class="button" onclick="selectProgramCiclo(this, 'ESVAZIAR')">ESVAZIAR</button>
+</div>
+
+<div class="container">
+        <label>NÍVEL DA ÁGUA:</label>
         <div class="grid" id="nivel">
             <button class="button" onclick="selectNivelAgua(this, 'ALTO')">ALTO</button>
             <button class="button" onclick="selectNivelAgua(this, 'MÉDIO')">MÉDIO</button>
             <button class="button" onclick="selectNivelAgua(this, 'BAIXO')">BAIXO</button>
         </div>
-        <div class="label">Botões de Controle:</div>
+</div>
+
+<div class="container">
+    <label>ACIONAMENTO:</label>
             <button class="button" id="toggleButtonLiga" onclick="checkSelectedButtons()">LIGAR</button>
-            <button class="button" id="toggleButtonPause" onclick="checkSelectedButtons()">PAUSAR</button>   
-        </div>
-   </div>
+             <label> ...     </label>
+            <button class="button" id="toggleButtonPausa" onclick="togglePauseButton()" style="display: none;">PAUSAR</button> 
+</div>
+
+<div class="container">
+    <label>STATUS:</label>
+    <textarea id="statusTextArea" class="mensagem" readonly>Informações adicionais sobre os eventos...</textarea>
+</div>
+
+
     <script>
         let selectedProgramCiclo = "";
         let selectedWaterLevel = "";
         let action = "";
-        const button = document.getElementById("toggleButton");
-        button.style.backgroundColor = "green";
+        const buttonLiga = document.getElementById("toggleButtonLiga");
+        buttonLiga.style.backgroundColor = "green";
+        const buttonPausa = document.getElementById("toggleButtonPausa");
+        buttonPausa.style.backgroundColor = "green";
+        
         function selectProgramCiclo(button, programa) {
             selectedProgramCiclo = programa;
             const buttons = document.querySelectorAll(`#${'ciclo'} .button`);
@@ -250,27 +277,44 @@ String getPage()
             button.classList.add('selected');
         }
         function togglePowerButton() {
-            const button = document.getElementById("toggleButton");
             let action = "";
             let programa = "";
             let nivel = "";
-            if (button.style.backgroundColor === "green") {
-                button.style.backgroundColor = "red";
-                button.innerText = "DESLIGAR";
+            if (buttonLiga.style.backgroundColor === "green") {
+                buttonLiga.style.backgroundColor = "red";
+                buttonLiga.innerText = "DESLIGAR";
                 action = "LIGAR";
                 programa = selectedProgramCiclo;
                 nivel = selectedWaterLevel;
+                buttonPausa.style.display = "block"; // Exibir o botão de pausar
             } else {
-                button.style.backgroundColor = "green";
-                button.innerText = "LIGAR";
+                buttonLiga.style.backgroundColor = "green";
+                buttonLiga.innerText = "LIGAR";
                 action = "DESLIGAR";
+                buttonPausa.style.display = "none"; // Ocultar o botão de pausar
+            }
+            sendData({ action: action, programa: selectedProgramCiclo, nivel: selectedWaterLevel });
+        }
+        function togglePauseButton() {
+            let action = "";
+            let programa = "";
+            let nivel = "";
+            if (buttonPausa.style.backgroundColor === "green") {
+                buttonPausa.style.backgroundColor = "red";
+                buttonPausa.innerText = "REINICIAR";
+                action = "PAUSAR";
+                programa = selectedProgramCiclo;
+                nivel = selectedWaterLevel;
+            } else {
+                buttonPausa.style.backgroundColor = "green";
+                buttonPausa.innerText = "PAUSAR";
+                action = "REINICIAR";
             }
             sendData({ action: action, programa: selectedProgramCiclo, nivel: selectedWaterLevel });
         }
         function checkSelectedButtons() {
             const selectedCiclo = document.querySelectorAll(`#${'ciclo'} .button.selected`);
             const selectedNivel = document.querySelectorAll(`#${'nivel'} .button.selected`);
-            const selectedPause = document.querySelectorAll(`#${'nivel'} .button.selected`);
             if (selectedCiclo.length !== 1 || selectedNivel.length !== 1) {
                 alert("Por favor, selecione um programa e um nível de água antes de ligar.");
             } else {
@@ -296,6 +340,10 @@ String getPage()
     xhr.setRequestHeader("Content-Type", "application/json");
     xhr.send(JSON.stringify(data));
 }
+        function updateStatus(message) {
+        const statusTextArea = document.getElementById("statusTextArea");
+        statusTextArea.value = message;
+    }
 
     </script>
 </body>
