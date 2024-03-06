@@ -2,6 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ArduinoJson.h>
+#include <map>
 ///////////////////////
 #define LIGA LOW
 #define DESLIGA HIGH
@@ -16,13 +17,13 @@
 #define BUZZER D8
 boolean P0[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 boolean P1[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-boolean P2[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-boolean P3[4] = {0, 0, 0, 0};
+boolean P2[4] = {0, 0, 0, 0};
 
 String msg = "Esta é a mensagem que eu quero postar";
+String msgStatus = "";
 String ESTADO;
-String programa;
-String nivel;
+String PROGRAMA;
+String NIVEL;
 boolean novoDado = true;
 bool dreno = false;
 unsigned long sendDataPrevMillis = 0;
@@ -88,10 +89,12 @@ void loop()
     server.handleClient();
     if (novoDado)
     {
-        msg = ESTADO;
         if (ESTADO == "LIGAR")
         {
-            // SeMexe(programa);
+            for (int i = 0; i < 16; i++)P0[i] = 0;
+            for (int i = 0; i < 8; i++)P1[i] = 0;
+            for (int i = 0; i < 4; i++)P2[i] = 0;
+            SeMexe(PROGRAMA);
             Serial.println(ESTADO);
             delay(1000);
         }
@@ -105,11 +108,13 @@ void loop()
         {
             Serial.println(ESTADO);
             delay(1000);
+            desligar(); // Chama a função desligar() caso contrário
         }
         else if (ESTADO == "REINICIAR")
         {
             Serial.println(ESTADO);
             delay(1000);
+            SeMexe(PROGRAMA);
         }
     }
     novoDado = false;
@@ -130,9 +135,11 @@ void handleData()
     deserializeJson(doc, server.arg("plain"));
 
     String action = doc["action"];
-    String programa = doc["programa"];
-    String nivel = doc["nivel"];
+    String prog = doc["programa"];
+    String level = doc["nivel"];
     ESTADO = action;
+    NIVEL = level;
+    PROGRAMA = prog;
 
     // Serial.print("Ação: ");
     // Serial.println(action);
@@ -146,9 +153,25 @@ void handleData()
 }
 void handleMsg()
 {
-    String msg = "Esta é a mensagem número " + String(random(10)); // gera uma mensagem com um número aleatório entre 0 e 9
-    Serial.println(msg);
-    server.send(200, "text/plain", msg);                           
+    String estado;
+    if (ESTADO == "LIGAR")
+    {
+        estado = "LIGADO";
+    }
+    else if (ESTADO == "DESLIGAR")
+    {
+        estado = "DESLIGADO";
+    }
+    else if (ESTADO == "PAUSAR")
+    {
+        estado = "PAUSADO";
+    }
+    else if (ESTADO == "REINICIAR")
+    {
+        estado = "LIGADO";
+    }
+    String msg = " Estado:" + estado + "\n Programa:" + PROGRAMA + "\n Nível:" + NIVEL + msgStatus ;//msgStatus; // gera uma mensagem com um número aleatório entre 0 e 9
+    server.send(200, "text/plain", msg);
 }
 
 String getPage()
@@ -197,11 +220,11 @@ String getPage()
             display: block;
             margin: 5px auto;
         }
-
+ 
         .button:hover {
-            background-color: #45a049;
+            background-color: green;
         }
-
+ 
         .button.selected {
             background-color: blue;
         }
@@ -251,9 +274,6 @@ String getPage()
         <div class="container">
             <label>ACIONAMENTO:</label>
             <button class="button" id="toggleButtonLiga" onclick="checkSelectedButtons()">LIGAR</button>
-            <label> ... </label>
-            <button class="button" id="toggleButtonPausa" onclick="togglePauseButton()"
-                style="display: none;">PAUSAR</button>
         </div>
 
         <div class="container">
@@ -261,7 +281,10 @@ String getPage()
             <textarea id="statusTextArea" class="mensagem"
                 readonly>Informações adicionais sobre os eventos...</textarea>
         </div>
-
+        <div class="container">
+            <button class="button" id="toggleButtonPausa" onclick="togglePauseButton()"
+                style="display: none;">PAUSAR</button>
+        </div>
 
         <script>
             let selectedProgramCiclo = "";
@@ -311,6 +334,11 @@ String getPage()
                     buttonPausa.style.display = "none"; // Ocultar o botão de pausar
                 }
                 sendData({ action: action, programa: selectedProgramCiclo, nivel: selectedWaterLevel });
+                // inativando os botões de programa e ciclo
+                var buttons = document.querySelectorAll('#ciclo button, #nivel button');
+                buttons.forEach(function (button) {
+                    button.disabled = !button.disabled;
+                });
             }
             function togglePauseButton() {
                 let action = "";
@@ -390,62 +418,42 @@ String getPage()
 
 ////////////////////////    ENCHER   //////////////////////
 
-boolean Encher(String nivel)
+boolean Encher(String NIVEL)
 {
     /*
         1. Quando o nível for atingido o sensor de nível retorna zero.
         2. Adotou-se a correspondencia (string=> valor): "ALTO"=1 ; "MEDIO"=2 ; "BAIXO"=3.
     */
-    byte Nivel;
+    // Variável para armazenar o pino do nível
+
+    int Nivel = 1;
     digitalWrite(DRENO, DESLIGA);
     digitalWrite(MOTOR, DESLIGA);
+    // Mapeamento entre os nomes dos níveis e os pinos correspondentes
+    std::map<String, int> nivelPinos = {
+        {"ALTO", NIVEL_ALTO},
+        {"MEDIO", NIVEL_MEDIO},
+        {"BAIXO", NIVEL_BAIXO}};
 
-    if (nivel.equals(String("ALTO")))
+    // Verifica se o nível especificado existe no mapa e atribui o pino correspondente a Nivel
+    if (nivelPinos.find(NIVEL) != nivelPinos.end())
     {
-        Nivel = 1;
-    }
-    else if (nivel.equals(String("MEDIO")))
-    {
-        Nivel = 2;
+        Nivel = nivelPinos[NIVEL];
     }
     else
     {
-        Nivel = 3;
+        Nivel = NIVEL_BAIXO; // Se não corresponder a nenhum nível, assume-se baixo
     }
-    Serial.println("Enchendo");
-    switch (Nivel)
+    Serial.println("Enchendo ........");
+    digitalWrite(AGUA, LIGA);
+
+    // Loop enquanto o nível especificado estiver ativo
+    while (digitalRead(Nivel))
     {
-    case 1:
-    {
-        while (digitalRead(NIVEL_ALTO))
-        {
-            delay(10);
-            digitalWrite(AGUA, LIGA);
-            delay(10);
-        }
+        msgStatus = "\n\n Enchendo";
+        delay(1000);
     }
-    break;
-    case 2:
-    {
-        while (digitalRead(NIVEL_MEDIO))
-        {
-            delay(10);
-            digitalWrite(AGUA, LIGA);
-            delay(10);
-        }
-    }
-    break;
-    case 3:
-    {
-        while (digitalRead(NIVEL_BAIXO))
-        {
-            delay(10);
-            digitalWrite(AGUA, LIGA);
-            delay(10);
-        }
-    }
-    break;
-    }
+
     digitalWrite(AGUA, DESLIGA);
     return true;
 }
@@ -462,7 +470,7 @@ boolean Drenar()
       ii)  Se o nivel da agua estiver abaixo do nível "BAIXO" o dreno ficará ligado por mais DT segundos.
 
     */
-    long unsigned int timeDreno;
+    long unsigned int Time_Dreno;
     long unsigned int DT = 40; // tempo que fica ligado depois de atingir o nível zero.
     digitalWrite(AGUA, DESLIGA);
     digitalWrite(MOTOR, DESLIGA);
@@ -471,11 +479,12 @@ boolean Drenar()
     {
         delay(100);
     }
-    timeDreno = millis() / 1000 + DT;
-    while (millis() / 1000 < timeDreno)
+    msgStatus="DENTRO DO DRENO( sim)";
+    Time_Dreno = millis() / 1000 + DT;
+    while (millis() / 1000 < Time_Dreno)
     {
-        Serial.println("Drenando");
-        delay(1000);
+        msgStatus = "\n\n Esvaziando  \n Tempo Restante: " + String(Time_Dreno - millis() / 1000) + " seg.";
+        delay(20000);
     }
     digitalWrite(DRENO, DESLIGA);
     return true;
@@ -486,12 +495,13 @@ boolean Molho(long unsigned int DT)
     /*
        DT - tempo do molho em minutos
     */
-    Encher(nivel);
+    Encher(NIVEL);
     long unsigned int Time_Molho = millis() / 1000 + DT * 60;
     while (millis() / 1000 < Time_Molho)
     {
         Serial.println("De molho");
-        delay(100);
+        msgStatus = "\n\n De Molho   \n Tempo Restante: " + String(Time_Molho - millis() / 1000) + " seg.";
+        delay(1000);
     }
     return true;
 }
@@ -501,13 +511,15 @@ boolean Bater(long unsigned int DT)
     /*
         DT - tempo de bater em minutos
     */
-    Encher(nivel);
+    Encher(NIVEL);
     long unsigned Time_Bater = millis() / 1000 + DT * 60;
     digitalWrite(MOTOR, LIGA);
     while (millis() / 1000 < Time_Bater)
     {
         delay(1000);
-        Serial.println("Batendo");
+        Serial.print("Batendo:");
+        msgStatus = "\n\n Batendo   \n Tempo Restante: " + String(Time_Bater - millis() / 1000) + " seg.";
+        Serial.println(Time_Bater - millis() / 1000);
     }
     digitalWrite(MOTOR, DESLIGA);
     return true;
@@ -580,32 +592,32 @@ void SeMexe(String programa)
         }
         break;
     case 1: // Normal.(3532)   => 16 minutos.
+        if (!P1[0])
+            P1[0] = Bater(2);
+        else if (!P1[1])
+            P1[1] = Molho(4);
+        else if (!P1[2])
+            P1[2] = Bater(2);
+        else if (!P1[3])
+            P1[3] = Drenar();
+        else if (!P1[4])
+            P1[4] = Bater(2);
+        else if (!P1[5])
+            P1[5] = Molho(3);
+        else if (!P1[6])
+            P1[6] = Bater(1);
+        else if (!P1[7])
+            P1[7] = Drenar();
+        break;
+    case 2: // Delicada. (2322)    => 07 minutos.
         if (!P2[0])
             P2[0] = Bater(2);
         else if (!P2[1])
-            P2[1] = Molho(4);
+            P2[1] = Molho(2);
         else if (!P2[2])
-            P2[2] = Bater(2);
+            P2[2] = Bater(1);
         else if (!P2[3])
             P2[3] = Drenar();
-        else if (!P2[4])
-            P2[4] = Bater(2);
-        else if (!P2[5])
-            P2[5] = Molho(3);
-        else if (!P2[6])
-            P2[6] = Bater(1);
-        else if (!P2[7])
-            P2[7] = Drenar();
-        break;
-    case 2: // Delicada. (2322)    => 07 minutos.
-        if (!P3[0])
-            P3[0] = Bater(2);
-        else if (!P3[1])
-            P3[1] = Molho(2);
-        else if (!P3[2])
-            P3[2] = Bater(1);
-        else if (!P3[3])
-            P3[3] = Drenar();
         break;
     case 3: // Drenar.
         if (!drenado)
@@ -614,17 +626,20 @@ void SeMexe(String programa)
     case 4: // Molho.
         if (!cheio)
         {
-            cheio = Encher(nivel);
+            cheio = Encher(NIVEL);
             Bater(1);
             break;
         }
     }
+
+    /*
     DT = millis() / 1000 + 3600;
     while (millis() / 1000 < DT)
     {
         buzina();
     }
     noTone(BUZZER);
+    */
 }
 void buzina()
 {
