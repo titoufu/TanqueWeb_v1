@@ -3,6 +3,10 @@
 #include <ESP8266WebServer.h>
 #include <ArduinoJson.h>
 #include <map>
+#include <Ticker.h>
+
+Ticker timer;
+
 ///////////////////////
 #define LIGA LOW
 #define DESLIGA HIGH
@@ -15,14 +19,15 @@
 #define DRENO D6
 #define AGUA D7
 #define BUZZER D8
+
 boolean P0[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 boolean P1[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 boolean P2[4] = {0, 0, 0, 0};
 
 String msg = "Esta é a mensagem que eu quero postar";
 String msgStatus = "";
-String ESTADO;
-String PROGRAMA;
+String ESTADO = "";
+String PROGRAMA = "";
 String NIVEL;
 boolean novoDado = true;
 bool dreno = false;
@@ -32,6 +37,7 @@ void buzina(void);
 void desligar(void);
 void sendData(const char *data);
 void handleMsg();
+void handleClientWrapper();
 
 ////////////////////////////
 const char *ssid = "ZEUS_2G";
@@ -42,6 +48,7 @@ ESP8266WebServer server(80);
 void handleRoot();
 String getPage();
 void handleData();
+
 
 void setup()
 {
@@ -81,9 +88,15 @@ void setup()
     pinMode(NIVEL_BAIXO, INPUT);
     pinMode(BUZZER, OUTPUT);
 
-    ///////////////////////////
+    /////
+    // Configura o temporizador para chamar handleClient a cada 10 segundos
+    timer.attach(10000, handleClientWrapper);
+    /////
 }
-
+void handleClientWrapper() {
+    Serial.println(".");
+    server.handleClient();
+}
 void loop()
 {
     server.handleClient();
@@ -91,9 +104,12 @@ void loop()
     {
         if (ESTADO == "LIGAR")
         {
-            for (int i = 0; i < 16; i++)P0[i] = 0;
-            for (int i = 0; i < 8; i++)P1[i] = 0;
-            for (int i = 0; i < 4; i++)P2[i] = 0;
+            for (int i = 0; i < 16; i++)
+                P0[i] = 0;
+            for (int i = 0; i < 8; i++)
+                P1[i] = 0;
+            for (int i = 0; i < 4; i++)
+                P2[i] = 0;
             SeMexe(PROGRAMA);
             Serial.println(ESTADO);
             delay(1000);
@@ -102,13 +118,13 @@ void loop()
         {
             Serial.println(ESTADO);
             delay(1000);
-            desligar(); // Chama a função desligar() caso contrário
+            desligar(); // Chama a função desligar()
         }
         else if (ESTADO == "PAUSAR")
         {
             Serial.println(ESTADO);
             delay(1000);
-            desligar(); // Chama a função desligar() caso contrário
+            desligar(); // Chama a função desligar()
         }
         else if (ESTADO == "REINICIAR")
         {
@@ -130,7 +146,6 @@ void handleData()
 {
 
     // Manipule os dados recebidos do cliente
-    // StaticJsonDocument<200> doc;
     JsonDocument doc;
     deserializeJson(doc, server.arg("plain"));
 
@@ -141,12 +156,12 @@ void handleData()
     NIVEL = level;
     PROGRAMA = prog;
 
-    // Serial.print("Ação: ");
-    // Serial.println(action);
-    // Serial.print("Programa: ");
-    // Serial.println(programa);
-    // Serial.print("Nível: ");
-    // Serial.println(nivel);
+    Serial.print("Estado: ");
+    Serial.println(ESTADO);
+    Serial.print("Programa: ");
+    Serial.println(PROGRAMA);
+    Serial.print("Nível: ");
+    Serial.println(NIVEL);
 
     server.send(200, "text/plain", "Dados recebidos pelo ESP8266.");
     novoDado = true;
@@ -170,7 +185,7 @@ void handleMsg()
     {
         estado = "LIGADO";
     }
-    String msg = " Estado:" + estado + "\n Programa:" + PROGRAMA + "\n Nível:" + NIVEL + msgStatus ;//msgStatus; // gera uma mensagem com um número aleatório entre 0 e 9
+    String msg = " Estado:" + estado + "\n Programa:" + PROGRAMA + "\n Nível:" + NIVEL + msgStatus; // msgStatus; // gera uma mensagem com um número aleatório entre 0 e 9
     server.send(200, "text/plain", msg);
 }
 
@@ -415,7 +430,15 @@ String getPage()
 </html>)=====";
     return webpage;
 }
-
+//////////////////////   VERIFICA PAUSAR ///////////////////
+void pausaTudo()
+{
+    desligar();
+    while (ESTADO == "PAUSAR")
+    {
+        msgStatus = "\n\n Sistema PAUSADO";
+    }
+}
 ////////////////////////    ENCHER   //////////////////////
 
 boolean Encher(String NIVEL)
@@ -445,15 +468,19 @@ boolean Encher(String NIVEL)
         Nivel = NIVEL_BAIXO; // Se não corresponder a nenhum nível, assume-se baixo
     }
     Serial.println("Enchendo ........");
-    digitalWrite(AGUA, LIGA);
-
     // Loop enquanto o nível especificado estiver ativo
+    digitalWrite(AGUA, LIGA);
     while (digitalRead(Nivel))
     {
+        Serial.println("LINHA 462");
+        if (ESTADO == "PAUSAR")
+        {
+            pausaTudo();
+            digitalWrite(AGUA, LIGA);
+        }
         msgStatus = "\n\n Enchendo";
         delay(1000);
     }
-
     digitalWrite(AGUA, DESLIGA);
     return true;
 }
@@ -475,16 +502,28 @@ boolean Drenar()
     digitalWrite(AGUA, DESLIGA);
     digitalWrite(MOTOR, DESLIGA);
     digitalWrite(DRENO, LIGA);
+    Serial.println("Esvaziando  ...");
     while (!digitalRead(NIVEL_BAIXO))
     {
+        if (ESTADO == "PAUSAR")
+        {
+            pausaTudo();
+            digitalWrite(DRENO, LIGA);
+        }
+        msgStatus = "\n\n Esvaziando  \n Tempo Restante: mais que 40 seg.";
         delay(100);
     }
-    msgStatus="DENTRO DO DRENO( sim)";
     Time_Dreno = millis() / 1000 + DT;
     while (millis() / 1000 < Time_Dreno)
     {
+        if (ESTADO == "PAUSAR")
+        {
+            pausaTudo();
+            digitalWrite(DRENO, LIGA);
+            Time_Dreno = millis() / 1000 + DT * 60;
+        }
         msgStatus = "\n\n Esvaziando  \n Tempo Restante: " + String(Time_Dreno - millis() / 1000) + " seg.";
-        delay(20000);
+        delay(5000);
     }
     digitalWrite(DRENO, DESLIGA);
     return true;
@@ -496,10 +535,15 @@ boolean Molho(long unsigned int DT)
        DT - tempo do molho em minutos
     */
     Encher(NIVEL);
+    Serial.println("De molho");
     long unsigned int Time_Molho = millis() / 1000 + DT * 60;
     while (millis() / 1000 < Time_Molho)
     {
-        Serial.println("De molho");
+        if (ESTADO == "PAUSAR")
+        {
+            pausaTudo();
+            Time_Molho = millis() / 1000 + DT * 60;
+        }
         msgStatus = "\n\n De Molho   \n Tempo Restante: " + String(Time_Molho - millis() / 1000) + " seg.";
         delay(1000);
     }
@@ -512,10 +556,16 @@ boolean Bater(long unsigned int DT)
         DT - tempo de bater em minutos
     */
     Encher(NIVEL);
-    long unsigned Time_Bater = millis() / 1000 + DT * 60;
     digitalWrite(MOTOR, LIGA);
+    long unsigned Time_Bater = millis() / 1000 + DT * 60;
     while (millis() / 1000 < Time_Bater)
     {
+        if (ESTADO == "PAUSAR")
+        {
+            pausaTudo();
+            digitalWrite(MOTOR, LIGA);
+            Time_Bater = millis() / 1000 + DT * 60;
+        }
         delay(1000);
         Serial.print("Batendo:");
         msgStatus = "\n\n Batendo   \n Tempo Restante: " + String(Time_Bater - millis() / 1000) + " seg.";
@@ -551,7 +601,6 @@ void SeMexe(String programa)
     {
         Programa = 4;
     }
-    Serial.printf("Programa: %i    programa: %s\n", Programa, programa.c_str());
     switch (Programa)
     {
     case 0: //  Muita Suja. (5342-3322-2422) => 38 minutos.
@@ -632,15 +681,20 @@ void SeMexe(String programa)
         }
     }
 
-    /*
     DT = millis() / 1000 + 3600;
     while (millis() / 1000 < DT)
     {
+        if (ESTADO == "PAUSAR")
+        {
+            noTone(BUZZER);
+            pausaTudo();
+            DT = millis() / 1000 + 3600;
+        }
         buzina();
     }
     noTone(BUZZER);
-    */
 }
+
 void buzina()
 {
     tone(BUZZER, 200);
